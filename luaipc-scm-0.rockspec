@@ -1,11 +1,11 @@
 package = "luaipc"
 version = "scm-0"
 source = {
-  url = "git://github.com/siffiejoe/lua-luaipc"
+  url = "git://github.com/bainchild/lua-luaipc"
 }
 description = {
   summary = "Portable binding for various IPC mechanisms.",
-  homepage = "https://github.com/siffiejoe/lua-luaipc/",
+  homepage = "https://github.com/bainchild/lua-luaipc/",
   license = "MIT"
 }
 -- we probably support more, but it lacks testing (and
