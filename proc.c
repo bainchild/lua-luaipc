@@ -111,7 +111,7 @@ static void compactenv( lua_State* L, int idx ) {
 
 static int addtoenv( lua_State* L, int idx1, int idx2 ) {
   int n = 0;
-  idx2 = lua_absindex( L, idx2 );
+  idx2 = ipc_absindex( L, idx2 );
   lua_getuservalue( L, idx1 );
   if( lua_type( L, -1 ) != LUA_TTABLE )
     luaL_error( L, "does not have uservalue/environment table" );
@@ -246,6 +246,89 @@ LUA_KFUNCTION( l_proc_waitk ) {
   return luaL_error( L, "invalid ctx in process wait function" );
 }
 
+LUA_KFUNCTION( l_proc_no_waitk ) {
+  l_proc_handle* h = lua_touserdata( L, 1 );
+  int child_complete = 0;
+  int stdin_complete = 0;
+  int stdout_complete = 0;
+  int stderr_complete = 0;
+  int rv = 0;
+  char const* data = NULL;
+  size_t len = 0;
+  (void)status;
+  lua_settop( L, 5 ); /* handle, child_complete, ..., stderr_complete */
+  /* lua_settop */
+  switch( ctx ) {
+    case 0:
+        /* call blocking ipc function to check for readable input or
+         * writable output (also checks for dead child) */
+        rv = ipc_proc_waitio( &h->h, &child_complete, &stdin_complete,
+                              &stdout_complete, &stderr_complete );
+        if( rv != 0 )
+          return pusherror( L, rv );
+        /* this function may yield, so we have to save all temporary
+         * data in the Lua state. */
+        lua_pushboolean( L, child_complete );
+        lua_replace( L, 2 );
+        lua_pushboolean( L, stdin_complete );
+        lua_replace( L, 3 );
+        lua_pushboolean( L, stdout_complete );
+        lua_replace( L, 4 );
+        lua_pushboolean( L, stderr_complete );
+        lua_replace( L, 5 );
+        /* call handler function from uservalue */
+        if( lua_toboolean( L, 4 ) ) { /* stdout_complete */
+          ipc_getuservaluefield( L, 1, "callback" );
+          lua_pushliteral( L, "stdout" );
+          rv = ipc_proc_stdoutready( &h->h, &data, &len );
+          if( rv != 0 ) {
+            lua_callk( L, pusherror( L, rv )+1, 0, 1, l_proc_no_waitk );
+          } else if( len > 0 ) {
+            lua_pushlstring( L, data, len );
+            lua_callk( L, 2, 0, 1, l_proc_no_waitk );
+          } else
+            lua_pop( L, 2 );
+        }
+    case 1:
+        if( lua_toboolean( L, 5 ) ) { /* stderr_complete */
+          ipc_getuservaluefield( L, 1, "callback" );
+          lua_pushliteral( L, "stderr" );
+          rv = ipc_proc_stderrready( &h->h, &data, &len );
+          if( rv != 0 ) {
+            lua_callk( L, pusherror( L, rv )+1, 0, 2, l_proc_no_waitk );
+          } else if( len > 0 ) {
+            lua_pushlstring( L, data, len );
+            lua_callk( L, 2, 0, 2, l_proc_no_waitk );
+          } else
+            lua_pop( L, 2 );
+        }
+    case 2:
+        if( lua_toboolean( L, 2 ) ) { /* child_complete */
+          int stat = 0;
+          char const* what = NULL;
+          rv = ipc_proc_wait( &h->h, &stat, &what );
+          h->is_valid = 0;
+          if( rv != 0 )
+            return pusherror( L, rv );
+          else {
+            if( stat == 0 && *what == 'e' )
+              lua_pushboolean( L, 1 );
+            else
+              lua_pushnil( L );
+            lua_pushstring( L, what );
+            lua_pushinteger( L, stat );
+            return 3;
+          }
+        }
+        if( lua_toboolean( L, 3 ) ) { /* stdin_complete */
+          rv = startoutput( L, h, 1 );
+          if( rv != 0 )
+            return pusherror( L, rv );
+        }
+  }
+  return 0;
+}
+
 static int l_proc_wait( lua_State* L ) {
   /* we do parameter checking here, so that we can avoid it in the
    * continuation function above. */
@@ -255,6 +338,14 @@ static int l_proc_wait( lua_State* L ) {
   return l_proc_waitk( L, 0, 0 );
 }
 
+static int l_proc_nowait( lua_State* L ) {
+  /* we do parameter checking here, so that we can avoid it in the
+   * continuation function above. */
+  l_proc_handle* h = luaL_checkudata( L, 1, NAME );
+  if( !h->is_valid )
+    luaL_error( L, "attempt to use invalid process object" );
+  return l_proc_no_waitk( L, 0, 0 );
+}
 
 static int l_proc_write( lua_State* L ) {
   l_proc_handle* h = luaL_checkudata( L, 1, NAME );
@@ -351,6 +442,7 @@ static int l_proc_spawn( lua_State* L ) {
 IPC_API int luaopen_ipc_proc( lua_State* L ) {
   luaL_Reg const methods[] = {
     { "kill", l_proc_kill },
+    { "nowait", l_proc_nowait },
     { "wait", l_proc_wait },
     { "write", l_proc_write },
     { NULL, NULL }

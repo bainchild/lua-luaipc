@@ -239,6 +239,7 @@ A process handle has the following methods:
 *   `h:write( ... ) ==> true`
 *   `h:kill( "term"/"kill" ) ==> true`
 *   `h:wait() ==> true/nil, string, number`
+*   `h:nowait() ==> true/nil, string, number`
 
 `h:write()` accepts strings and enqueues them to be sent to the child
 process' `stdin` stream when it is ready. You may also pass `proc.EOF`
@@ -252,7 +253,8 @@ to exit. The callback given to the `proc.spawn()` function is called
 with the stream name (`"stdout"` or `"stdin"`) and the received data
 (or the usual error values) when output from the child is available.
 On Lua 5.2+ you may yield from the callback function. Return values of
-`h:wait()` are the same as for `os.execute()` on recent Lua versions.
+`h:wait()` are the same as for `os.execute()` on recent Lua versions.  
+`h:nowait` is a non-blocking version of `h:wait`
 
 
 ###                           ipc.strfile                          ###

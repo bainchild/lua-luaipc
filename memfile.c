@@ -364,7 +364,7 @@ static int memfile_gc( lua_State* L ) {
 
 IPC_LOCAL void* memfile_udata( lua_State* L, int idx,
                                char const* name ) {
-  int i = lua_absindex( L, idx );
+  int i = ipc_absindex( L, idx );
   (void)tomemfile( L, i );
   lua_getuservalue( L, i );
   lua_rawgeti( L, -1, OBJECT_INDEX );
@@ -378,9 +378,9 @@ IPC_LOCAL void memfile_new( lua_State* L, void* addr, size_t n,
                             int perms, int oidx, int closeidx,
                             int flushidx ) {
   memfile* mf = NULL;
-  oidx = lua_absindex( L, oidx );
-  closeidx = lua_absindex( L, closeidx );
-  flushidx = lua_absindex( L, flushidx );
+  oidx = ipc_absindex( L, oidx );
+  closeidx = ipc_absindex( L, closeidx );
+  flushidx = ipc_absindex( L, flushidx );
   mf = lua_newuserdata( L, sizeof( *mf ) );
   mf->addr = addr;
   mf->n = n;
