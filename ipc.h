@@ -93,8 +93,10 @@ IPC_LOCAL void* ipc_testudata( lua_State* L, int idx,
 #define lua_setuservalue( L, i ) lua_setfenv( L, i )
 #define lua_getuservalue( L, i ) lua_getfenv( L, i )
 
+#ifndef luaL_newlib
 #define luaL_newlib( L, r ) \
   (lua_newtable( L ), luaL_register( L, NULL, r ))
+#endif
 
 #define lua_callk( L, na, nr, ctx, cont ) \
   ((void)ctx, (void)cont, lua_call( L, na, nr ))
